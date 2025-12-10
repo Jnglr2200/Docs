@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import '../../core/../constants/app_colors.dart';
+// Importación corregida para app_colors
+import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_styles.dart';
 import '../../../models/persona_model.dart';
+// Importación corregida: asume que 'detail' es hermana de 'widgets' dentro de 'core/views'
 import '../detail/detail_page.dart';
 
 class ProfileCard extends StatelessWidget {

@@ -1,10 +1,11 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:math'; // Importamos para generar un ID temporal
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
-import '../../models/persona_model.dart';
+import '../../../models/persona_model.dart';
 
 class AddPersonPage extends StatefulWidget {
   const AddPersonPage({super.key});
@@ -116,10 +117,16 @@ class _AddPersonPageState extends State<AddPersonPage> {
         await File(_selectedImage!.path).copy(localImagePath);
       }
 
+      // GENERAMOS UN ID ÚNICO TEMPORAL
+      final String uniqueId = DateTime.now().millisecondsSinceEpoch.toString() + Random().nextInt(1000).toString();
+
       // Creamos el objeto PersonaModel para devolverlo
       final nuevaPersona = PersonaModel(
+        // Proveer el ID
+        id: uniqueId,
         nombre: _nombreController.text,
-        edad: int.tryParse(_edadController.text) ?? 0,
+        // *** CORRECCIÓN CLAVE: Convertir el int a String para el modelo ***
+        edad: (int.tryParse(_edadController.text) ?? 0).toString(),
         fotoPath: localImagePath,
       );
 

@@ -1,55 +1,44 @@
-// Modelo que representa un documento individual (Cédula, Receta, Correo, etc.)
 class DocumentoModel {
-  final String id;           // Identificador único
-  final String titulo;       // Ejemplo: "Cédula", "Correo Electrónico"
-  final String descripcion;  // Ejemplo: "Cédula de ciudadanía", "Correo principal"
-  final String valor;        // El dato en sí (el número de cédula) o la ruta del archivo (path de imagen)
-  final String tipo;         // 'texto' (para copiar) o 'archivo' (para imagen/pdf)
+  final String id;
+  final String titulo;
+  final String descripcion;
+  final String categoria; // E.g., 'Personal', 'Salud', 'Legal'
+  final String? datoTexto; // Para documentos como cédulas o números
+  final String? rutaImagen; // Para documentos escaneados o recetas
 
   DocumentoModel({
     required this.id,
     required this.titulo,
     required this.descripcion,
-    required this.valor,
-    required this.tipo,
+    required this.categoria,
+    this.datoTexto,
+    this.rutaImagen,
   });
 
-  // Método para crear una copia del documento (útil para editar)
-  DocumentoModel copyWith({
-    String? id,
-    String? titulo,
-    String? descripcion,
-    String? valor,
-    String? tipo,
-  }) {
-    return DocumentoModel(
-      id: id ?? this.id,
-      titulo: titulo ?? this.titulo,
-      descripcion: descripcion ?? this.descripcion,
-      valor: valor ?? this.valor,
-      tipo: tipo ?? this.tipo,
-    );
-  }
+  // Método para convertir a Mapa (Compatibilidad con PersonaModel)
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'titulo': titulo,
+    'descripcion': descripcion,
+    'categoria': categoria,
+    'datoTexto': datoTexto,
+    'rutaImagen': rutaImagen,
+  };
 
-  // Convertir a Mapa (para guardar en base de datos local o JSON)
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'titulo': titulo,
-      'descripcion': descripcion,
-      'valor': valor,
-      'tipo': tipo,
-    };
-  }
+  // Crear Documento desde Mapa (Compatibilidad con PersonaModel)
+  factory DocumentoModel.fromMap(Map<String, dynamic> map) => DocumentoModel(
+    id: map['id'] as String,
+    titulo: map['titulo'] as String,
+    descripcion: map['descripcion'] as String,
+    categoria: map['categoria'] as String,
+    datoTexto: map['datoTexto'] as String?,
+    rutaImagen: map['rutaImagen'] as String?,
+  );
 
-  // Crear Documento desde un Mapa (al leer de base de datos)
-  factory DocumentoModel.fromMap(Map<String, dynamic> map) {
-    return DocumentoModel(
-      id: map['id'] ?? '',
-      titulo: map['titulo'] ?? '',
-      descripcion: map['descripcion'] ?? '',
-      valor: map['valor'] ?? '',
-      tipo: map['tipo'] ?? 'texto',
-    );
-  }
+  // Alias toJson para mantener compatibilidad si algo más lo usa
+  Map<String, dynamic> toJson() => toMap();
+
+  // Alias fromJson para mantener compatibilidad
+  factory DocumentoModel.fromJson(Map<String, dynamic> json) =>
+      DocumentoModel.fromMap(json);
 }

@@ -1,80 +1,80 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:docs2/models/persona_model.dart';
-import 'package:docs2/models/documento_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../models/persona_model.dart';
 
-// Controlador para la Pantalla Principal (Home)
-// Maneja la lista de familiares.
 class HomeController extends ChangeNotifier {
-
-  // Lista privada de personas
   List<PersonaModel> _personas = [];
+  bool _isLoading = true;
 
-  // Estado de carga para mostrar spinners en la UI
-  bool _isLoading = false;
+  // Clave para guardar en el almacenamiento del teléfono
+  static const String _storageKey = 'lista_familiares_v1';
 
-  // Getters para acceder a los datos desde la Vista
   List<PersonaModel> get personas => _personas;
   bool get isLoading => _isLoading;
 
-  // Constructor: Carga datos iniciales al instanciar
   HomeController() {
     cargarPersonas();
   }
 
-  // Simulación de carga de datos (Aquí conectarías con Base de Datos luego)
+  // Cargar lista desde el disco al iniciar la app
   Future<void> cargarPersonas() async {
     _isLoading = true;
-    notifyListeners(); // Avisa a la vista que empiece a mostrar "Cargando..."
+    notifyListeners();
 
-    // Simulación de espera de base de datos
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? personasJson = prefs.getString(_storageKey);
 
-    // Datos de prueba (Mock Data)
-    if (_personas.isEmpty) {
-      _personas = [
-        PersonaModel(
-          id: '1',
-          nombre: 'Abuela María',
-          edad: '82 años',
-          documentos: [
-            DocumentoModel(
-              id: 'd1',
-              titulo: 'Cédula de Identidad',
-              descripcion: 'Documento oficial',
-              valor: '1710020030',
-              tipo: 'texto',
-            ),
-            DocumentoModel(
-              id: 'd2',
-              titulo: 'Receta Corazón',
-              descripcion: 'Cardiólogo Dr. Perez',
-              valor: 'assets/receta_demo.pdf', // Ruta simulada
-              tipo: 'archivo',
-            ),
-          ],
-        ),
-        PersonaModel(
-          id: '2',
-          nombre: 'Tío Jorge',
-          edad: '75 años',
-          documentos: [],
-        ),
-      ];
+      if (personasJson != null) {
+        final List<dynamic> decodedList = jsonDecode(personasJson);
+        _personas = decodedList.map((item) => PersonaModel.fromMap(item)).toList();
+      } else {
+        // Opcional: Si está vacío, iniciar con una lista vacía o datos de prueba
+        _personas = [];
+      }
+    } catch (e) {
+      debugPrint("Error cargando personas: $e");
     }
 
     _isLoading = false;
-    notifyListeners(); // Avisa a la vista que ya hay datos para mostrar
-  }
-
-  // Método para agregar una nueva persona
-  void agregarPersona(PersonaModel nuevaPersona) {
-    _personas.add(nuevaPersona);
-    notifyListeners(); // Actualiza la lista en pantalla
-  }
-
-  // Método para eliminar una persona
-  void eliminarPersona(String id) {
-    _personas.removeWhere((p) => p.id == id);
     notifyListeners();
+  }
+
+  // Guardar un nuevo familiar y persistir en disco
+  Future<void> agregarPersona(PersonaModel nuevaPersona) async {
+    _personas.add(nuevaPersona);
+    await _guardarEnDisco();
+    notifyListeners();
+  }
+
+  // Eliminar familiar y actualizar disco
+  Future<void> eliminarPersona(String id) async {
+    _personas.removeWhere((p) => p.id == id);
+    await _guardarEnDisco();
+    notifyListeners();
+  }
+
+  // --- NUEVO: Método para editar un familiar existente ---
+  Future<void> editarPersona(PersonaModel personaEditada) async {
+    // Buscamos el índice de la persona en la lista usando su ID único
+    final index = _personas.indexWhere((p) => p.id == personaEditada.id);
+
+    if (index != -1) {
+      // Reemplazamos el objeto antiguo con el nuevo
+      _personas[index] = personaEditada;
+      // Guardamos los cambios en el disco
+      await _guardarEnDisco();
+      // Notificamos a la UI para que se refresque
+      notifyListeners();
+    }
+  }
+
+  // Método privado para escribir en SharedPreferences
+  Future<void> _guardarEnDisco() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Convertimos la lista de objetos a una lista de Mapas y luego a Texto JSON
+    final String encodedData = jsonEncode(_personas.map((p) => p.toMap()).toList());
+    await prefs.setString(_storageKey, encodedData);
   }
 }
