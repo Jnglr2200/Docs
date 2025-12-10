@@ -1,225 +1,197 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_styles.dart';
-import '../../../models/persona_model.dart';
 import '../../../models/documento_model.dart';
-import '../../controllers/detail_controller.dart';
+import '../widgets/big_button.dart';
 
-class DetailPage extends StatefulWidget {
-  final PersonaModel persona;
+class DocumentFormPage extends StatefulWidget {
+  final DocumentoModel? documentoExistente;
+  final Function(DocumentoModel) onSave;
 
-  const DetailPage({super.key, required this.persona});
+  const DocumentFormPage({
+
+    super.key,
+    this.documentoExistente,
+    required this.onSave,
+  });
 
   @override
-  State<DetailPage> createState() => _DetailPageState();
+  State<DocumentFormPage> createState() => _DocumentFormPageState();
 }
 
-class _DetailPageState extends State<DetailPage> {
-  late DetailController _controller;
+class _DocumentFormPageState extends State<DocumentFormPage> {
+  final _formKey = GlobalKey<FormState>();
+
+  late TextEditingController _tituloCtrl;
+  late TextEditingController _descCtrl;
+  late TextEditingController _textoDatoCtrl;
+
+  String? _rutaImagen;
+  String _categoriaSeleccionada = 'General'; // Valor por defecto
+
+  // Lista de categorías disponibles
+  final List<String> _categorias = ['General', 'Salud', 'Legal', 'Financiero', 'Personal'];
 
   @override
   void initState() {
     super.initState();
-    _controller = DetailController();
-    _controller.setPersona(widget.persona);
+    _tituloCtrl = TextEditingController(text: widget.documentoExistente?.titulo ?? '');
+    _descCtrl = TextEditingController(text: widget.documentoExistente?.descripcion ?? '');
+    _textoDatoCtrl = TextEditingController(text: widget.documentoExistente?.datoTexto ?? '');
+    _rutaImagen = widget.documentoExistente?.rutaImagen;
+
+    if (widget.documentoExistente != null) {
+      _categoriaSeleccionada = widget.documentoExistente!.categoria;
+    }
+  }
+
+  @override
+  void dispose() {
+    _tituloCtrl.dispose();
+    _descCtrl.dispose();
+    _textoDatoCtrl.dispose();
+    super.dispose();
+  }
+
+  void _guardar() {
+    if (_formKey.currentState!.validate()) {
+      final nuevoDoc = DocumentoModel(
+        id: widget.documentoExistente?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        titulo: _tituloCtrl.text,
+        descripcion: _descCtrl.text,
+        categoria: _categoriaSeleccionada, // Guardamos la categoría seleccionada
+        datoTexto: _textoDatoCtrl.text.isEmpty ? null : _textoDatoCtrl.text,
+        rutaImagen: _rutaImagen,
+      );
+
+      widget.onSave(nuevoDoc);
+      Navigator.pop(context);
+    }
+  }
+
+  void _tomarFoto() {
+    setState(() {
+      _rutaImagen = 'assets/simulacion_foto.jpg';
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Simulación: Foto seleccionada")),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Usamos ListenableBuilder para escuchar cambios en el controlador (ej. si se agrega un doc)
-    return ListenableBuilder(
-      listenable: _controller,
-      builder: (context, child) {
-        final persona = _controller.persona!;
+    final esEdicion = widget.documentoExistente != null;
 
-        return Scaffold(
-          backgroundColor: AppColors.backgroundLight,
-          appBar: AppBar(
-            backgroundColor: AppColors.primaryBlue,
-            toolbarHeight: 80, // AppBar más alta para facilitar alcance
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 30),
-              onPressed: () => Navigator.pop(context),
-            ),
-            title: Text(
-              persona.nombre.toUpperCase(),
-              style: AppStyles.headline2.copyWith(color: Colors.white),
-            ),
-            centerTitle: true,
-          ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 40),
-            child: Column(
-              children: [
-                // 1. Cabecera con Foto y Edad
-                _buildHeader(persona),
-
-                const SizedBox(height: 20),
-
-                // Título de sección
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.folder_shared, size: 32, color: AppColors.primaryBlue),
-                      const SizedBox(width: 10),
-                      Text("DOCUMENTOS", style: AppStyles.headline2.copyWith(color: AppColors.primaryBlue)),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 10),
-
-                // 2. Lista de Documentos (Desplegables)
-                if (persona.documentos.isEmpty)
-                  _buildEmptyState()
-                else
-                  ListView.builder(
-                    shrinkWrap: true, // Importante para usar dentro de SingleChildScrollView
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: persona.documentos.length,
-                    itemBuilder: (context, index) {
-                      return _buildDocumentTile(persona.documentos[index]);
-                    },
-                  ),
-
-                const SizedBox(height: 30),
-
-                // 3. Botón de Agregar (Flotante o fijo al final)
-                _buildAddButton(),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // --- WIDGETS AUXILIARES ---
-
-  Widget _buildHeader(PersonaModel persona) {
-    return Container(
-      width: double.infinity,
-      color: Colors.white,
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.lightBlue,
-              border: Border.all(color: AppColors.primaryBlue, width: 4),
-              image: persona.fotoPath != null
-                  ? DecorationImage(image: FileImage(File(persona.fotoPath!)), fit: BoxFit.cover)
-                  : null,
-            ),
-            child: persona.fotoPath == null
-                ? const Icon(Icons.person, size: 80, color: AppColors.primaryBlue)
-                : null,
-          ),
-          const SizedBox(height: 16),
-          Text(persona.nombre, style: AppStyles.headline2),
-          const SizedBox(height: 4),
-          Text(persona.edad, style: AppStyles.bodyTextSecondary.copyWith(fontSize: 20)),
-        ],
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
+      appBar: AppBar(
+        title: Text(esEdicion ? "Editar Documento" : "Nuevo Documento"),
+        backgroundColor: AppColors.primaryBlue,
+        foregroundColor: Colors.white,
       ),
-    );
-  }
-
-  Widget _buildDocumentTile(DocumentoModel doc) {
-    final isFile = doc.tipo == 'archivo';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Theme(
-          // Quitamos las líneas divisorias por defecto del ExpansionTile para limpieza visual
-          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            backgroundColor: Colors.white,
-            collapsedBackgroundColor: Colors.white,
-
-            // Icono del documento
-            leading: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isFile ? Colors.orange.shade50 : Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                isFile ? Icons.description : Icons.text_fields,
-                color: isFile ? Colors.orange : AppColors.primaryBlue,
-                size: 30,
-              ),
-            ),
-
-            // Título del documento
-            title: Text(
-              doc.titulo,
-              style: AppStyles.bodyTextPrimary.copyWith(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text(doc.descripcion, style: AppStyles.bodyTextSecondary),
-
-            // CONTENIDO DESPLEGABLE
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _buildSectionTitle("Información Básica"),
+
+              // Título
+              _buildTextField(
+                controller: _tituloCtrl,
+                label: "Título",
+                hint: "Ej: Cédula, Receta...",
+                icon: Icons.title,
+                validator: (v) => v!.isEmpty ? "Obligatorio" : null,
+              ),
+              const SizedBox(height: 16),
+
+              // Descripción
+              _buildTextField(
+                controller: _descCtrl,
+                label: "Descripción",
+                hint: "Ej: De la abuela...",
+                icon: Icons.description,
+              ),
+              const SizedBox(height: 16),
+
+              // Selector de Categoría (Dropdown)
+              DropdownButtonFormField<String>(
+                value: _categoriaSeleccionada,
+                decoration: InputDecoration(
+                  labelText: "Tipo de Documento",
+                  prefixIcon: const Icon(Icons.category, color: AppColors.primaryBlue),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
+                items: _categorias.map((cat) {
+                  return DropdownMenuItem(value: cat, child: Text(cat));
+                }).toList(),
+                onChanged: (val) => setState(() => _categoriaSeleccionada = val!),
+              ),
+
+              const SizedBox(height: 30),
+
+              // Sección Imagen
+              _buildSectionTitle("Imagen (Opcional)"),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(20),
+                height: 180,
                 decoration: BoxDecoration(
-                  color: AppColors.backgroundLight,
-                  border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                  color: Colors.white,
+                  border: Border.all(color: Colors.grey.shade400),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Column(
+                child: _rutaImagen != null
+                    ? Stack(
+                  fit: StackFit.expand,
                   children: [
-                    // Muestra el valor (texto o nombre archivo)
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: Text(
-                        isFile ? "Archivo adjunto: ${doc.valor.split('/').last}" : doc.valor,
-                        style: AppStyles.documentValue,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Botones de Acción
-                    Row(
-                      children: [
-                        if (!isFile) ...[
-                          Expanded(
-                            child: _buildActionButton(
-                              icon: Icons.copy,
-                              label: "COPIAR",
-                              color: AppColors.successGreen,
-                              onTap: () => _controller.copiarAlPortapapeles(context, doc.valor),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                        ],
-                        Expanded(
-                          child: _buildActionButton(
-                            icon: isFile ? Icons.download : Icons.share,
-                            label: isFile ? "ABRIR" : "ENVIAR",
-                            color: AppColors.actionOrange,
-                            onTap: () => _controller.compartirDocumento(doc),
-                          ),
+                    _rutaImagen!.contains('assets')
+                        ? const Center(child: Icon(Icons.image, size: 60, color: Colors.blue))
+                        : Image.file(File(_rutaImagen!), fit: BoxFit.cover),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: CircleAvatar(
+                        backgroundColor: Colors.red,
+                        child: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.white),
+                          onPressed: () => setState(() => _rutaImagen = null),
                         ),
-                      ],
+                      ),
                     )
                   ],
+                )
+                    : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.camera_alt, size: 40, color: Colors.grey),
+                    TextButton(onPressed: _tomarFoto, child: const Text("AGREGAR FOTO"))
+                  ],
                 ),
+              ),
+
+              const SizedBox(height: 30),
+
+              // Sección Texto
+              _buildSectionTitle("Dato para Copiar (Opcional)"),
+              _buildTextField(
+                controller: _textoDatoCtrl,
+                label: "Texto / Número",
+                hint: "Ej: 17555...",
+                icon: Icons.copy,
+              ),
+
+              const SizedBox(height: 40),
+
+              BigButton(
+                label: "GUARDAR",
+                icon: Icons.save,
+                backgroundColor: AppColors.successGreen,
+                onTap: _guardar,
               ),
             ],
           ),
@@ -228,67 +200,31 @@ class _DetailPageState extends State<DetailPage> {
     );
   }
 
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return ElevatedButton(
-      onPressed: onTap,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        elevation: 3,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 30, color: Colors.white),
-          const SizedBox(height: 4),
-          Text(label, style: AppStyles.buttonLabel.copyWith(fontSize: 16)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Container(
-      padding: const EdgeInsets.all(40),
-      child: Column(
-        children: [
-          Icon(Icons.folder_open, size: 80, color: Colors.grey.shade300),
-          const SizedBox(height: 10),
-          Text(
-            "No hay documentos guardados aún.",
-            textAlign: TextAlign.center,
-            style: AppStyles.bodyTextSecondary,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAddButton() {
+  Widget _buildSectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: ElevatedButton.icon(
-        onPressed: () {
-          // TODO: Navegar a pantalla de formulario para agregar documento
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Próximamente: Pantalla de Agregar Documento")),
-          );
-        },
-        icon: const Icon(Icons.add_circle, size: 36, color: AppColors.primaryBlue),
-        label: Text("AGREGAR NUEVO", style: AppStyles.buttonLabel.copyWith(color: AppColors.primaryBlue)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,
-          side: const BorderSide(color: AppColors.primaryBlue, width: 2),
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          minimumSize: const Size(double.infinity, 60),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primaryBlue)),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      validator: validator,
+      style: const TextStyle(fontSize: 18),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: Icon(icon, color: AppColors.primaryBlue),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        filled: true,
+        fillColor: Colors.white,
       ),
     );
   }

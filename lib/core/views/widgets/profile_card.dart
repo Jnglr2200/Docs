@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import '../../../core/constants/app_colors.dart';
+import '../../core/../constants/app_colors.dart';
 import '../../../core/constants/app_styles.dart';
 import '../../../models/persona_model.dart';
 import '../detail/detail_page.dart';
@@ -10,7 +10,6 @@ class ProfileCard extends StatelessWidget {
 
   const ProfileCard({super.key, required this.persona});
 
-  // Función para manejar la navegación a la vista de detalle
   void _navigateToDetail(BuildContext context) {
     Navigator.push(
       context,
@@ -22,77 +21,96 @@ class ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
         child: InkWell(
           onTap: () => _navigateToDetail(context),
           borderRadius: BorderRadius.circular(20),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(24.0),
             child: Column(
+              mainAxisSize: MainAxisSize.min, // Se ajusta al contenido
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // 1. Foto Circular Grande
+                // 1. Foto Circular Grande Centrada
                 Container(
                   width: 100,
                   height: 100,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: AppColors.lightBlue,
-                    border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3), width: 2),
+                    border: Border.all(
+                      color: AppColors.primaryBlue.withOpacity(0.1),
+                      width: 4,
+                    ),
                     image: persona.fotoPath != null
-                    // Usamos FileImage para cargar la imagen desde la ruta local
-                        ? DecorationImage(image: FileImage(File(persona.fotoPath!)), fit: BoxFit.cover)
+                        ? DecorationImage(
+                      image: FileImage(File(persona.fotoPath!)),
+                      fit: BoxFit.cover,
+                    )
                         : null,
                   ),
                   child: persona.fotoPath == null
-                      ? const Icon(Icons.person, size: 60, color: AppColors.primaryBlue)
+                      ? const Icon(Icons.person, size: 50, color: AppColors.primaryBlue)
                       : null,
                 ),
 
                 const SizedBox(height: 16),
 
-                // 2. Información Texto
+                // 2. Información Centrada
                 Text(
                   persona.nombre,
-                  style: AppStyles.headline2,
+                  style: AppStyles.headline2.copyWith(fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 4),
                 Text(
                   persona.edad,
-                  style: AppStyles.bodyTextSecondary,
+                  style: AppStyles.bodyTextSecondary.copyWith(
+                    color: Colors.grey.shade500,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
 
                 const SizedBox(height: 20),
 
-                // 3. Indicador de Documentos y Botón Falso
-                Container(
+                // 3. Botón "VER DATOS" (Ancho completo)
+                SizedBox(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryBlue,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.folder_open, color: Colors.white, size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          "VER ${persona.documentos.length} DOCUMENTOS",
-                          style: AppStyles.buttonLabel.copyWith(
-                            color: Colors.white,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
+                  child: ElevatedButton(
+                    onPressed: () => _navigateToDetail(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryBlue,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30), // Bordes muy redondeados
+                      ),
+                      elevation: 2,
+                    ),
+                    child: Text(
+                      "VER DATOS",
+                      style: AppStyles.buttonLabel.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
-                )
+                ),
               ],
             ),
           ),
