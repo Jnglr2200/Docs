@@ -7,6 +7,8 @@ import 'AddPersonPage.dart';
 import 'EditPersonPage.dart';
 import '../detail/detail_page.dart';
 
+import '../../services/backup_service.dart'; // IMPORTAR EL SERVICIO NUEVO
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -17,6 +19,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   List<PersonaModel> _personas = [];
   bool _isLoading = true;
+  final BackupService _backupService = BackupService(); // Instancia del servicio
 
   // --- CONFIGURACIÓN DE ESTILO ---
   final Color kPrimaryColor = const Color(0xFF2196F3);
@@ -36,7 +39,6 @@ class _HomePageState extends State<HomePage> {
       try {
         final List<dynamic> decoded = jsonDecode(personasJson);
         setState(() {
-          // Usamos fromMap o fromJson según tu modelo
           _personas = decoded.map((e) => PersonaModel.fromMap(e as Map<String, dynamic>)).toList();
         });
       } catch (e) {
@@ -48,7 +50,6 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _guardarPersonas() async {
     final prefs = await SharedPreferences.getInstance();
-    // Usamos toMap() o toJson() según tu modelo.
     final List<Map<String, dynamic>> personasMap = _personas.map((p) => p.toMap()).toList();
     final String personasJson = jsonEncode(personasMap);
     await prefs.setString('personas', personasJson);
@@ -73,12 +74,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _navegarAgregarPersona({PersonaModel? persona}) async {
-    // Decidimos qué página abrir basándonos en si hay una persona o no
     Widget pageToOpen;
     if (persona != null) {
-      pageToOpen = EditPersonPage(persona: persona); // Para editar
+      pageToOpen = EditPersonPage(persona: persona);
     } else {
-      pageToOpen = const AddPersonPage(); // Para agregar (sin parámetros)
+      pageToOpen = const AddPersonPage();
     }
 
     final result = await Navigator.push(
@@ -90,7 +90,6 @@ class _HomePageState extends State<HomePage> {
 
     if (result != null && result is PersonaModel) {
       if (persona == null) {
-        // Modo Agregar
         setState(() {
           _personas.add(result);
         });
@@ -100,7 +99,6 @@ class _HomePageState extends State<HomePage> {
           );
         }
       } else {
-        // Modo Editar
         final index = _personas.indexWhere((p) => p.nombre == persona.nombre);
         if (index != -1) {
           setState(() {
@@ -117,6 +115,58 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // --- LÓGICA DE BACKUP ---
+  void _manejarBackup(String value) async {
+    if (value == 'export') {
+      // Mostrar indicador de carga
+      showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (c) => const Center(child: CircularProgressIndicator())
+      );
+
+      bool exito = await _backupService.crearCopiaSeguridad(context);
+
+      Navigator.pop(context); // Cerrar loader
+
+      if (exito && mounted) {
+        // Share_plus se encarga de mostrar el diálogo, así que solo notificamos éxito si es necesario
+      }
+    } else if (value == 'import') {
+      // Confirmación antes de sobrescribir
+      bool? confirm = await showDialog(
+          context: context,
+          builder: (c) => AlertDialog(
+            title: const Text("Restaurar Copia"),
+            content: const Text("⚠️ Esto sobrescribirá los datos actuales. ¿Deseas continuar?"),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text("Cancelar")),
+              ElevatedButton(onPressed: () => Navigator.pop(c, true), child: const Text("Continuar")),
+            ],
+          )
+      );
+
+      if (confirm == true) {
+        showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (c) => const Center(child: CircularProgressIndicator())
+        );
+
+        bool exito = await _backupService.restaurarCopiaSeguridad(context);
+
+        Navigator.pop(context); // Cerrar loader
+
+        if (exito && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Datos restaurados. Recargando..."), backgroundColor: Colors.green),
+          );
+          _cargarPersonas(); // Recargar la lista en pantalla
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -127,7 +177,35 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: kPrimaryColor,
         elevation: 2,
         centerTitle: true,
-        // Eliminamos las actions del AppBar porque ya no necesitamos el botón de seguridad
+        actions: [
+          // MENÚ DE BACKUP
+          PopupMenuButton<String>(
+            onSelected: _manejarBackup,
+            icon: const Icon(Icons.settings_backup_restore, size: 28),
+            tooltip: 'Copia de Seguridad',
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              const PopupMenuItem<String>(
+                value: 'export',
+                child: ListTile(
+                  leading: Icon(Icons.upload, color: Colors.blue),
+                  title: Text('Crear Respaldo'),
+                  subtitle: Text('Guardar datos y fotos'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'import',
+                child: ListTile(
+                  leading: Icon(Icons.download, color: Colors.green),
+                  title: Text('Restaurar Respaldo'),
+                  subtitle: Text('Desde archivo ZIP'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 10),
+        ],
       ),
       floatingActionButton: SizedBox(
         height: 70,
@@ -224,7 +302,6 @@ class _HomePageState extends State<HomePage> {
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
           ),
           subtitle: Text(
-            // Asumiendo que tu modelo tiene estos getters o campos
             "${persona.edadDisplay} | ${persona.relacion}",
             style: TextStyle(color: Colors.grey.shade600),
           ),
