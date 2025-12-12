@@ -24,8 +24,7 @@ class _DetailPageState extends State<DetailPage> {
 
   // --- Estado para el filtro ---
   String _filtroSeleccionado = 'Todos';
-  // Definimos las categorías posibles actualizadas según tu solicitud
-  final List<String> _categorias = ['Todos', 'Identificación', 'Factura', 'Receta', 'Contrato', 'Otro'];
+  final List<String> _categorias = ['Todos', 'Identificación', 'Factura', 'Cuenta Bancaria', 'Receta', 'Contrato', 'Otro'];
 
   // --- CONFIGURACIÓN DE ESTILO ---
   final Color kPrimaryColor = const Color(0xFF2196F3);
@@ -65,7 +64,6 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   Future<void> _eliminarDocumento(Map<String, dynamic> docToDelete) async {
-    // Buscamos el índice real en la lista completa, no en la filtrada
     final index = _documentos.indexOf(docToDelete);
     if (index != -1) {
       setState(() {
@@ -91,14 +89,13 @@ class _DetailPageState extends State<DetailPage> {
     if (result != null && result is Map<String, dynamic>) {
       setState(() {
         _documentos.add(result);
-        // Opcional: Cambiar el filtro a 'Todos' o a la categoría del nuevo doc para verlo
         _filtroSeleccionado = 'Todos';
       });
       await _guardarDocumentos();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Guardado correctamente", style: TextStyle(fontSize: 16))),
+          const SnackBar(content: Text("Guardado correctamente"), backgroundColor: Colors.green),
         );
       }
     }
@@ -116,7 +113,13 @@ class _DetailPageState extends State<DetailPage> {
     }
   }
 
-  Future<void> _compartirArchivo(String path) async {
+  Future<void> _compartirArchivo(String? path) async {
+    if (path == null || path.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Este documento no tiene archivo para compartir")),
+      );
+      return;
+    }
     try {
       final file = File(path);
       if (await file.exists()) {
@@ -133,18 +136,15 @@ class _DetailPageState extends State<DetailPage> {
     }
   }
 
-  // --- Lógica de Filtrado ---
   List<Map<String, dynamic>> get _documentosFiltrados {
     if (_filtroSeleccionado == 'Todos') {
       return _documentos;
     }
-    // Filtramos comparando con el campo 'tipo' que guardas en el documento
     return _documentos.where((doc) => doc['tipo'] == _filtroSeleccionado).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Obtenemos la lista filtrada para usarla en el build
     final listaVisible = _documentosFiltrados;
 
     return Scaffold(
@@ -167,14 +167,11 @@ class _DetailPageState extends State<DetailPage> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column( // Cambiamos SingleChildScrollView por Column para fijar cabecera y filtros
+          : Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // --- CABECERA DE PERFIL ---
           _buildHeader(),
-
           const Divider(height: 1, thickness: 1),
-
           // --- BARRA DE FILTROS ---
           Container(
             color: kBackgroundColor,
@@ -218,7 +215,7 @@ class _DetailPageState extends State<DetailPage> {
             ),
           ),
 
-          // --- LISTA DE DOCUMENTOS (SCROLLABLE) ---
+          // --- LISTA DE DOCUMENTOS ---
           Expanded(
             child: listaVisible.isEmpty
                 ? _buildEmptyState()
@@ -227,7 +224,6 @@ class _DetailPageState extends State<DetailPage> {
               itemCount: listaVisible.length,
               separatorBuilder: (ctx, i) => const SizedBox(height: 15),
               itemBuilder: (context, index) {
-                // Pasamos el objeto real para poder borrarlo correctamente
                 return _buildBigCard(listaVisible[index]);
               },
             ),
@@ -289,12 +285,23 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   Widget _buildBigCard(Map<String, dynamic> doc) {
-    bool imageExists = File(doc['path']).existsSync();
+    String path = doc['path'] ?? "";
+    bool hasImage = path.isNotEmpty && File(path).existsSync();
     String contenido = doc['contenido'] ?? '';
+    String? banco = doc['banco'];
+
+    IconData icon;
+    switch (doc['tipo']) {
+      case 'Cuenta Bancaria': icon = Icons.account_balance; break;
+      case 'Identificación': icon = Icons.badge; break;
+      case 'Factura': icon = Icons.receipt_long; break;
+      case 'Receta': icon = Icons.medical_services; break;
+      case 'Contrato': icon = Icons.article; break;
+      default: icon = Icons.description;
+    }
 
     return Dismissible(
-      // Usamos el path como llave única
-      key: Key(doc['path']),
+      key: Key(path + DateTime.now().toString()),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
@@ -318,24 +325,25 @@ class _DetailPageState extends State<DetailPage> {
               color: kPrimaryColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            // Lógica de iconos simple basada en el tipo de documento
-            child: Icon(
-              doc['tipo'] == 'Identificación' ? Icons.badge
-                  : doc['tipo'] == 'Factura' ? Icons.receipt
-                  : doc['tipo'] == 'Receta' ? Icons.medical_services
-                  : doc['tipo'] == 'Contrato' ? Icons.article
-                  : Icons.description,
-              color: kPrimaryColor,
-              size: 30,
-            ),
+            child: Icon(icon, color: kPrimaryColor, size: 30),
           ),
-          title: Text(
-            doc['titulo'] ?? "Sin título",
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              color: Colors.black87,
-            ),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (banco != null)
+                Text(
+                    banco,
+                    style: TextStyle(fontSize: 14, color: kPrimaryColor, fontWeight: FontWeight.bold)
+                ),
+              Text(
+                doc['titulo'] ?? "Sin título",
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
           ),
           subtitle: Text(
             doc['tipo'] ?? "Documento",
@@ -346,21 +354,42 @@ class _DetailPageState extends State<DetailPage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    height: 200,
-                    color: Colors.grey.shade100,
-                    child: imageExists
-                        ? Image.file(File(doc['path']), fit: BoxFit.cover)
-                        : const Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                if (hasImage) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      height: 200,
+                      width: double.infinity,
+                      color: Colors.white, // Fondo blanco para que los logos se vean bien
+                      child: Image.file(File(path), fit: BoxFit.contain), // CAMBIO: contain para ver todo el logo
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
+                  const SizedBox(height: 20),
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey.shade200)
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.hide_image_outlined, color: Colors.grey.shade400),
+                        const SizedBox(width: 10),
+                        Text("Sin imagen adjunta", style: TextStyle(color: Colors.grey.shade500)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+
                 if (contenido.isNotEmpty) ...[
-                  const Text(
-                    "Contenido:",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black54),
+                  Text(
+                    doc['tipo'] == 'Cuenta Bancaria' ? "Número de Cuenta:" : "Detalles:",
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black54),
                   ),
                   const SizedBox(height: 8),
                   Container(
@@ -372,11 +401,12 @@ class _DetailPageState extends State<DetailPage> {
                     ),
                     child: SelectableText(
                       contenido,
-                      style: const TextStyle(fontSize: 16, color: Colors.black87, height: 1.5),
+                      style: const TextStyle(fontSize: 18, color: Colors.black87, height: 1.5, fontFamily: 'Monospace'),
                     ),
                   ),
                   const SizedBox(height: 20),
                 ],
+
                 Row(
                   children: [
                     Expanded(
@@ -391,19 +421,21 @@ class _DetailPageState extends State<DetailPage> {
                         label: const Text("COPIAR", style: TextStyle(color: Colors.white)),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          side: BorderSide(color: kPrimaryColor),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    if (hasImage) ...[
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: BorderSide(color: kPrimaryColor),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () => _compartirArchivo(path),
+                          icon: Icon(Icons.share, size: 20, color: kPrimaryColor),
+                          label: Text("ENVIAR", style: TextStyle(color: kPrimaryColor)),
                         ),
-                        onPressed: () => _compartirArchivo(doc['path']),
-                        icon: Icon(Icons.share, size: 20, color: kPrimaryColor),
-                        label: Text("ENVIAR", style: TextStyle(color: kPrimaryColor)),
                       ),
-                    ),
+                    ]
                   ],
                 ),
               ],
@@ -425,7 +457,7 @@ class _DetailPageState extends State<DetailPage> {
           Text(
             _filtroSeleccionado == 'Todos'
                 ? "No hay documentos"
-                : "No hay documentos de $_filtroSeleccionado",
+                : "No hay de $_filtroSeleccionado",
             style: TextStyle(fontSize: 18, color: Colors.grey.shade500),
           ),
         ],
